@@ -18,7 +18,7 @@ class LibraryEntry(models.Model):
     status = models.CharField(max_length=20, default=STATUS_WISHLIST)
     hours_played = models.IntegerField(default=0)
     
-        user = models.ForeignKey(
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL, # Importante
         on_delete=models.CASCADE,
         null=True,        # para no romper datos existentes
