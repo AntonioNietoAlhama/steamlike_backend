@@ -1,24 +1,58 @@
 import json
+
 from django.db import IntegrityError
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
+
 from .models import LibraryEntry
+
 
 ALLOWED_STATUSES = LibraryEntry.ALLOWED_STATUSES
 
+
 # ── health ───────────────────────────────────────────────────────────────────
+
 @require_GET
 def health(request):
     return JsonResponse({"status": "ok"})
 
+
 # ── helpers ──────────────────────────────────────────────────────────────────
+
 def _error_400(errors):
     details = {e["field"]: e["message"] for e in errors}
-    return JsonResponse({"error": "validation_error","message": "Datos de entrada inválidos","details": details},status=400)
+    return JsonResponse(
+        {
+            "error": "validation_error",
+            "message": "Datos de entrada inválidos",
+            "details": details,
+        },
+        status=400,
+    )
+
+def _error_401():
+    return JsonResponse(
+        {
+            "error": "unauthorized",
+            "message": "No autenticado",
+        },
+        status=401,
+    )
+
+def _error_404():
+    return JsonResponse(
+        {
+            "error": "not_found",
+            "message": "La entrada solicitada no existe",
+        },
+        status=404,
+    )
+
 
 def _validate_entry(data):
     errors = []
+
     if "external_game_id" not in data:
         errors.append({"field": "external_game_id", "message": "El campo 'external_game_id' es obligatorio."})
     elif not isinstance(data["external_game_id"], str) or not data["external_game_id"].strip():
@@ -40,15 +74,32 @@ def _validate_entry(data):
 
     return errors
 
+
 # ── /api/library/entries/ ─────────────────────────────────────────────────────
+
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
 def library_entries(request):
+
+    # ← NUEVO: comprobar autenticación
+    if not request.user.is_authenticated:
+        return _error_401()
+
     if request.method == "GET":
-        entries = LibraryEntry.objects.all()
-        data = [{"id": e.id,"external_game_id": e.external_game_id,"status": e.status,"hours_played": e.hours_played} for e in entries]
+        # ← NUEVO: filtrar solo las entradas del usuario autenticado
+        entries = LibraryEntry.objects.filter(user=request.user)
+        data = [
+            {
+                "id": e.id,
+                "external_game_id": e.external_game_id,
+                "status": e.status,
+                "hours_played": e.hours_played,
+            }
+            for e in entries
+        ]
         return JsonResponse(data, safe=False, status=200)
 
+    # POST
     try:
         data = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
@@ -62,24 +113,62 @@ def library_entries(request):
         return _error_400(errors)
 
     try:
-        entry = LibraryEntry.objects.create(external_game_id=data["external_game_id"],status=data["status"],hours_played=data["hours_played"])
+        entry = LibraryEntry.objects.create(
+            external_game_id=data["external_game_id"],
+            status=data["status"],
+            hours_played=data["hours_played"],
+            user=request.user,  # ← NUEVO: asociar al usuario autenticado
+        )
     except IntegrityError:
-        return JsonResponse({"error": "duplicate_entry","message": "El juego ya existe en la biblioteca","details": {"external_game_id": "duplicate"}},status=400)
+        return JsonResponse(
+            {
+                "error": "duplicate_entry",
+                "message": "El juego ya existe en la biblioteca",
+                "details": {"external_game_id": "duplicate"},
+            },
+            status=400,
+        )
 
-    return JsonResponse({"id": entry.id,"external_game_id": entry.external_game_id,"status": entry.status,"hours_played": entry.hours_played},status=201)
+    return JsonResponse(
+        {
+            "id": entry.id,
+            "external_game_id": entry.external_game_id,
+            "status": entry.status,
+            "hours_played": entry.hours_played,
+        },
+        status=201,
+    )
+
 
 # ── /api/library/entries/{id}/ ────────────────────────────────────────────────
+
 @csrf_exempt
 @require_http_methods(["GET", "PATCH"])
 def library_entry_by_id(request, id):
+
+    # ← NUEVO: comprobar autenticación
+    if not request.user.is_authenticated:
+        return _error_401()
+
+    # ← NUEVO: buscar solo entre las entradas del usuario autenticado
     try:
-        entry = LibraryEntry.objects.get(pk=id)
+        entry = LibraryEntry.objects.get(pk=id, user=request.user)
     except LibraryEntry.DoesNotExist:
-        return JsonResponse({"error": "not_found","message": "La entrada solicitada no existe"},status=404)
+        return _error_404()
 
     if request.method == "GET":
-        return JsonResponse({"id": entry.id,"external_game_id": entry.external_game_id,"status": entry.status,"hours_played": entry.hours_played},status=200)
+        return JsonResponse(
+            {
+                "id": entry.id,
+                "external_game_id": entry.external_game_id,
+                "status": entry.status,
+                "hours_played": entry.hours_played,
+            },
+            status=200,
+        )
 
+
+    # PATCH
     try:
         data = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
@@ -94,6 +183,7 @@ def library_entry_by_id(request, id):
         return _error_400(errors)
 
     errors = []
+
     if "status" in data:
         if not isinstance(data["status"], str):
             errors.append({"field": "status", "message": "'status' debe ser un string."})
@@ -115,4 +205,12 @@ def library_entry_by_id(request, id):
         entry.hours_played = data["hours_played"]
     entry.save()
 
-    return JsonResponse({"id": entry.id,"external_game_id": entry.external_game_id,"status": entry.status,"hours_played": entry.hours_played},status=200)
+    return JsonResponse(
+        {
+            "id": entry.id,
+            "external_game_id": entry.external_game_id,
+            "status": entry.status,
+            "hours_played": entry.hours_played,
+        },
+        status=200,
+    ) 
