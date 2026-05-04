@@ -1,9 +1,7 @@
-cat > .github/workflows/ci.yml << 'EOF'
 name: CI
 
 on:
   push:
-  pull_request:
 
 jobs:
   test:
@@ -45,9 +43,5 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      - name: Ejecutar migraciones
-        run: python manage.py migrate
-
       - name: Ejecutar tests
-        run: python manage.py test library.tests accounts
-EOF
+        run: python manage.py test
