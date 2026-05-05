@@ -43,19 +43,19 @@ jobs:
 
       - name: Instalar dependencias
         run: pip install -r requirements.txt
-        working-directory: Entorno_servidor/steamlike_backend
+        
 
       - name: Ejecutar migraciones
         run: python manage.py migrate
-        working-directory: Entorno_servidor/steamlike_backend
+        
 
       - name: Ejecutar tests con coverage
         run: coverage run manage.py test library.tests accounts
-        working-directory: Entorno_servidor/steamlike_backend
+        
 
       - name: Mostrar porcentaje de cobertura
         run: coverage report
-        working-directory: Entorno_servidor/steamlike_backend
+        
 
   deploy:
     runs-on: ubuntu-latest
