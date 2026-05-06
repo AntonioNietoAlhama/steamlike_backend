@@ -114,7 +114,6 @@ CSRF_COOKIE_SAMESITE = "Lax"
 MAILEROO_API_KEY = _env("MAILEROO_API_KEY", "")
 MAILEROO_FROM = _env("MAILEROO_FROM", "")
 
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -132,6 +131,16 @@ LOGGING = {
     },
     "loggers": {
         "steamlike_backend.email_service": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "accounts.views": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "catalog.catalog_service": {  # ← añadir esto
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
